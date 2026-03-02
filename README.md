@@ -81,7 +81,7 @@ flowchart LR
 
 ### Prerequisites
 
-- Docker Desktop (for Postgres/RabbitMQ/worker)
+- Docker Desktop (for Postgres/Redis/RabbitMQ/worker)
 - Node.js 18+ (for the frontend)
 - JDK 25 (the backend declares `java.version=25` in [code_judge/pom.xml](code_judge/pom.xml))
 
@@ -90,16 +90,17 @@ flowchart LR
 - Backend API: `http://localhost:8080`
 - Frontend dev server: `http://localhost:5173`
 - Postgres: `localhost:5433` (mapped to container `5432`)
+- Redis: `localhost:6379`
 - RabbitMQ AMQP: `localhost:5672`
 - RabbitMQ management UI: `http://localhost:15672` (default creds `guest` / `guest`)
 
 ### 1) Start infrastructure
 
-From the repo root, start the required services (PostgreSQL, RabbitMQ, and workers):
+From the repo root, start the required services (PostgreSQL, Redis, RabbitMQ, and workers):
 
 ```bash
 # Start containers in background
-docker compose up -d postgres rabbitmq
+docker compose up -d postgres redis rabbitmq
 
 # Build and scale worker containers (default: 5 replicas)
 docker compose up -d --build judge-worker
@@ -113,7 +114,7 @@ docker compose up -d --build --scale judge-worker=10 judge-worker
 To verify services are running:
 ```bash
 docker compose ps
-# Should show: postgres, rabbitmq, and judge-worker containers with status "running"
+# Should show: postgres, redis, rabbitmq, and judge-worker containers with status "running"
 ```
 
 ### 2) Run the backend (Spring Boot)
@@ -176,6 +177,7 @@ From the repo root:
 
 - `cd client`
 - `npm install`
+- Ensure you have an appropriate `.env` file (e.g., `VITE_GOOGLE_CLIENT_ID` for Google login).
 - `npm run dev`
 
 The backend enables CORS for `http://localhost:5173` (see `@CrossOrigin` in the submission controller).
@@ -305,6 +307,7 @@ USERS=10 CONCURRENCY=20 DURATION_SEC=60 python stress_test.py
 - `POLL_TIMEOUT_SEC` — Max time to wait for result (default: `60`)
 - `AUTH_EMAIL` — Email for login (default: `demo@example.com`)
 - `AUTH_PASSWORD` — Password for login (default: `password123`)
+- `AUTH_USERNAME` — Username for auto-registration (default: `demo_user`)
 - `AUTO_REGISTER` — Auto-register users if needed (default: `true`)
 
 The script logs submission metrics, RabbitMQ queue depth, and system performance.
@@ -507,10 +510,12 @@ Key entities:
 
 Configuration is read from [code_judge/src/main/resources/application.properties](code_judge/src/main/resources/application.properties):
 - Database connection (PostgreSQL)
+- Redis connection (for session storage and rate limiting)
 - RabbitMQ connection
 - JWT secret and expiration
 - CORS allowed origins
 - File upload path for test cases
+- OAuth2 configuration (Google Client ID and Secret)
 
 ### C++ Worker Notes
 

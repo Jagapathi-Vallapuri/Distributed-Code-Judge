@@ -330,8 +330,8 @@ function App() {
                 <div className="brand">
                     <div className="logo-wrap" aria-hidden>
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M3 12L9 6L15 12L9 18L3 12Z" fill="white"/>
-                            <path d="M15 6L21 12L15 18" stroke="rgba(255,255,255,0.5)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M3 12L9 6L15 12L9 18L3 12Z" fill="white" />
+                            <path d="M15 6L21 12L15 18" stroke="rgba(255,255,255,0.5)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                     </div>
                     <div>
@@ -381,67 +381,68 @@ function App() {
 
                     <div className={`problem-drawer-wrap ${sidebarOpen ? "open" : "closed"}`} aria-hidden={!sidebarOpen}>
                         <aside className="panel sidebar drawer">
-                                <div className="drawer-header">
-                                    <h2 className="sidebar-title">All Problems</h2>
-                                    <button
-                                        className="drawer-close"
-                                        type="button"
-                                        onClick={() => setSidebarOpen(false)}
-                                        aria-label="Close problem list"
-                                    >
-                                        Close
-                                    </button>
-                                </div>
+                            <div className="drawer-header">
+                                <h2 className="sidebar-title">All Problems</h2>
+                                <button
+                                    className="drawer-close"
+                                    type="button"
+                                    onClick={() => setSidebarOpen(false)}
+                                    aria-label="Close problem list"
+                                >
+                                    Close
+                                </button>
+                            </div>
 
-                                <div className="problem-tools">
-                                    <input
-                                        className="problem-search"
-                                        type="text"
-                                        value={problemQuery}
-                                        onChange={(event) => setProblemQuery(event.target.value)}
-                                        placeholder="Search title, difficulty..."
-                                        aria-label="Search problems"
-                                    />
-                                    <span className="problem-counter">Showing {filteredProblems.length} / {problems.length}</span>
-                                </div>
+                            <div className="problem-tools">
+                                <input
+                                    className="problem-search"
+                                    type="text"
+                                    value={problemQuery}
+                                    onChange={(event) => setProblemQuery(event.target.value)}
+                                    placeholder="Search title, difficulty..."
+                                    aria-label="Search problems"
+                                />
+                                <span className="problem-counter">Showing {filteredProblems.length} / {problems.length}</span>
+                            </div>
 
-                                {problemsLoading && <p>Loading problems...</p>}
-                                {problemsError && <p className="status-error">{problemsError}</p>}
+                            {problemsLoading && <p>Loading problems...</p>}
+                            {problemsError && <p className="status-error">{problemsError}</p>}
 
-                                <div className="problem-list">
-                                    {filteredProblems.map((problem, index) => {
-                                        const tone = String(problem.difficulty || "unknown").toLowerCase();
-                                        return (
-                                            <div
-                                                key={problem.id}
-                                                className={`problem-card ${selectedProblemId === problem.id ? "active" : ""}`}
-                                                onClick={() => {
+                            <div className="problem-list">
+                                {filteredProblems.map((problem, index) => {
+                                    const tone = String(problem.difficulty || "unknown").toLowerCase();
+                                    return (
+                                        <div
+                                            key={problem.id}
+                                            className={`problem-card ${selectedProblemId === problem.id ? "active" : ""}`}
+                                            style={{ "--anim-index": index }}
+                                            onClick={() => {
+                                                setSelectedProblemId(problem.id);
+                                            }}
+                                            role="button"
+                                            tabIndex={0}
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Enter") {
                                                     setSelectedProblemId(problem.id);
-                                                }}
-                                                role="button"
-                                                tabIndex={0}
-                                                onKeyDown={(event) => {
-                                                    if (event.key === "Enter") {
-                                                        setSelectedProblemId(problem.id);
-                                                    }
-                                                }}
-                                            >
-                                                <div className="problem-row">
-                                                    <h3>{problem.title}</h3>
-                                                    <span className="problem-index">{String(index + 1).padStart(2, "0")}</span>
-                                                </div>
-                                                <div className="problem-meta">
-                                                    {problem.difficulty && <span className={`pill ${tone}`}>{problem.difficulty}</span>}
-                                                    {problem.testCaseCount != null && <span className="pill neutral">{problem.testCaseCount} tests</span>}
-                                                    {problem.timeLimitSeconds != null && <span className="pill neutral">{problem.timeLimitSeconds}s</span>}
-                                                </div>
+                                                }
+                                            }}
+                                        >
+                                            <div className="problem-row">
+                                                <h3>{problem.title}</h3>
+                                                <span className="problem-index">{String(index + 1).padStart(2, "0")}</span>
                                             </div>
-                                        );
-                                    })}
-                                    {!problemsLoading && filteredProblems.length === 0 && (
-                                        <div className="problem-list-empty">No problems match your search.</div>
-                                    )}
-                                </div>
+                                            <div className="problem-meta">
+                                                {problem.difficulty && <span className={`pill ${tone}`}>{problem.difficulty}</span>}
+                                                {problem.testCaseCount != null && <span className="pill neutral">{problem.testCaseCount} tests</span>}
+                                                {problem.timeLimitSeconds != null && <span className="pill neutral">{problem.timeLimitSeconds}s</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {!problemsLoading && filteredProblems.length === 0 && (
+                                    <div className="problem-list-empty">No problems match your search.</div>
+                                )}
+                            </div>
                         </aside>
                     </div>
 
