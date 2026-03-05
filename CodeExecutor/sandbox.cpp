@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <signal.h>
 #include <fcntl.h>
 #include <cstring>
 #include <fstream>
@@ -12,6 +13,14 @@
 #include <sched.h>
 #include <vector>
 #include <memory>
+
+static volatile pid_t g_child_pid = 0;
+
+static void wallclock_handler(int) {
+    if (g_child_pid > 0) {
+        kill(g_child_pid, SIGKILL);
+    }
+}
 
 namespace CgroupUtils {
 
@@ -146,17 +155,20 @@ ExecutionResult Sandbox::run(LanguageStrategy &strategy,
         if (read(pipe_fd[0], &buffer, 1) <= 0) _exit(INTERNAL_ERROR);
         close(pipe_fd[0]);
 
-        unshare(CLONE_NEWNET);
+        if (unshare(CLONE_NEWNET) != 0) _exit(INTERNAL_ERROR);
         redirect_std_streams(input_file, output_file, error_file);
         
         rlimit cpu = {(rlim_t)time_limit_sec, (rlim_t)time_limit_sec + 1};
-        setrlimit(RLIMIT_CPU, &cpu);
+        if (setrlimit(RLIMIT_CPU, &cpu) != 0) _exit(INTERNAL_ERROR);
         
         rlimit fsize = {10 * 1024 * 1024, 10 * 1024 * 1024};
-        setrlimit(RLIMIT_FSIZE, &fsize);
+        if (setrlimit(RLIMIT_FSIZE, &fsize) != 0) _exit(INTERNAL_ERROR);
 
         rlimit as_lim = { strategy.get_rlimit_as(memory_limit_mb), strategy.get_rlimit_as(memory_limit_mb) };
-        setrlimit(RLIMIT_AS, &as_lim);
+        if (setrlimit(RLIMIT_AS, &as_lim) != 0) _exit(INTERNAL_ERROR);
+
+        rlimit nproc = {1, 1};
+        if (setrlimit(RLIMIT_NPROC, &nproc) != 0) _exit(INTERNAL_ERROR);
 
         auto args = strategy.get_run_args(id, memory_limit_mb);
         auto c_args = to_c_args(args);
@@ -171,11 +183,22 @@ ExecutionResult Sandbox::run(LanguageStrategy &strategy,
 
         CgroupUtils::setup(pid, memory_limit_mb);
 
+        g_child_pid = pid;
+        struct sigaction sa = {};
+        sa.sa_handler = wallclock_handler;
+        sa.sa_flags = 0;
+        sigemptyset(&sa.sa_mask);
+        sigaction(SIGALRM, &sa, nullptr);
+        alarm(time_limit_sec * 2 + 5);
+
         write(pipe_fd[1], "X", 1);
         close(pipe_fd[1]);
         int status;
         struct rusage usage;
         wait4(pid, &status, 0, &usage);
+
+        alarm(0);
+        g_child_pid = 0;
 
         CgroupUtils::cleanup(pid);
 

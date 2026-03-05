@@ -4,6 +4,7 @@ import com.project.code_judge.Config.RabbitMQConfig;
 import com.project.code_judge.Dto.ExecutionResult;
 import com.project.code_judge.Entity.Submission;
 import com.project.code_judge.Entity.SubmissionStatus;
+import com.project.code_judge.Exception.SubmissionNotFoundException;
 import com.project.code_judge.Repository.SubmissionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -21,13 +22,12 @@ public class ResultConsumer {
 
         UUID submissionId = UUID.fromString(result.getId());
         Submission submission = submissionRepository.findById(submissionId)
-                .orElseThrow(() -> new RuntimeException("Submission not found."));
+                .orElseThrow(() -> new SubmissionNotFoundException("Submission not found with ID: " + submissionId));
         submission.setError(result.getError());
         submission.setVerdict(result.getVerdict());
         submission.setTimeTaken(result.getTime_ms());
         submission.setMemoryUsed(result.getMemory_kb());
         
-        // Set status based on whether error occurred
         if (result.getError() != null && !result.getError().isEmpty()) {
             submission.setStatus(SubmissionStatus.FAILED);
         } else {

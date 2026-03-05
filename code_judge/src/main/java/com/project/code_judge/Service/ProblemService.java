@@ -2,6 +2,9 @@ package com.project.code_judge.Service;
 
 import com.project.code_judge.Dto.CreateProblem;
 import com.project.code_judge.Entity.Problem;
+import com.project.code_judge.Exception.DuplicateSlugException;
+import com.project.code_judge.Exception.ProblemNotFoundException;
+import com.project.code_judge.Exception.TestCaseUploadException;
 import com.project.code_judge.Repository.ProblemRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +37,7 @@ public class ProblemService {
         }
 
         if(problemRepository.existsBySlug(dto.getSlug())){
-            throw new RuntimeException("Slug already exists: " + dto.getSlug());
+            throw new DuplicateSlugException("Slug already exists: " + dto.getSlug());
         }
 
         Problem newProblem = new Problem();
@@ -51,14 +54,19 @@ public class ProblemService {
     @Transactional
     public void uploadTestCases(Long problemId, MultipartFile zipFile) throws IOException {
         Problem problem = problemRepository.findById(problemId)
-                .orElseThrow(() -> new RuntimeException("Problem not found"));
-        Path targetDir = Paths.get(storagePath, String.valueOf(problemId));
-        fileService.unzipAndSave(zipFile, targetDir);
-        try(Stream<Path> files = Files.list(targetDir)){
-            long count = files.filter(p -> p.getFileName().toString().endsWith("_in.txt")).count();
-            problem.setTestCaseCount((int) count);
+                .orElseThrow(() -> new ProblemNotFoundException("Problem not found with ID: " + problemId));
+
+        try {
+            Path targetDir = Paths.get(storagePath, String.valueOf(problemId));
+            fileService.unzipAndSave(zipFile, targetDir);
+            try(Stream<Path> files = Files.list(targetDir)){
+                long count = files.filter(p -> p.getFileName().toString().endsWith("_in.txt")).count();
+                problem.setTestCaseCount((int) count);
+            }
+            problemRepository.save(problem);
+        } catch (IOException e) {
+            throw new TestCaseUploadException("Failed to upload test cases: " + e.getMessage(), e);
         }
-        problemRepository.save(problem);
     }
 
     public List<Problem> getAllProblems(){
@@ -66,7 +74,8 @@ public class ProblemService {
     }
 
     public Problem getProblem(Long id){
-        return problemRepository.findById(id).orElseThrow(() -> new RuntimeException("Problem not found"));
+        return problemRepository.findById(id)
+                .orElseThrow(() -> new ProblemNotFoundException("Problem not found with ID: " + id));
     }
 
 }

@@ -5,9 +5,12 @@ import com.project.code_judge.Dto.UserLogin;
 import com.project.code_judge.Dto.UserResponse;
 import com.project.code_judge.Entity.AuthProvider;
 import com.project.code_judge.Entity.User;
+import com.project.code_judge.Exception.InvalidCredentialsException;
+import com.project.code_judge.Exception.UserAlreadyExistsException;
 import com.project.code_judge.Repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,7 +25,7 @@ public class AuthService {
 
     public UserResponse registerUser(RegisterUser dto){
         if(userRepository.findByEmail(dto.getEmail()).isPresent()){
-            throw new IllegalArgumentException("User already registered with the mail");
+            throw new UserAlreadyExistsException("User already registered with the email");
         }
         User user = new User();
         user.setUsername(dto.getUsername());
@@ -34,7 +37,11 @@ public class AuthService {
     }
 
     public Authentication authenticate(UserLogin dto){
-        return authenticationManager.authenticate( new UsernamePasswordAuthenticationToken( dto.getEmail(), dto.getPassword()));
+        try {
+            return authenticationManager.authenticate( new UsernamePasswordAuthenticationToken( dto.getEmail(), dto.getPassword()));
+        } catch (BadCredentialsException e) {
+            throw new InvalidCredentialsException("Invalid email or password", e);
+        }
     }
 
 

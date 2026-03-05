@@ -39,7 +39,11 @@ services:
     user: root
     networks:
       - judge-net
-    privileged: true
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+    cap_drop:
+      - ALL
     volumes:
       - ./judge_data:/app/judge_data
   rabbitmq:

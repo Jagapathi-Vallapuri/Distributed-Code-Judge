@@ -6,6 +6,8 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.project.code_judge.Entity.AuthProvider;
 import com.project.code_judge.Entity.User;
+import com.project.code_judge.Exception.InvalidGoogleTokenException;
+import com.project.code_judge.Exception.OAuthException;
 import com.project.code_judge.Repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,7 +33,7 @@ public class OAuthService {
                     .setAudience(Collections.singletonList(clientId))
                     .build();
             GoogleIdToken gToken = verifier.verify(token);
-            if ( gToken == null) throw new IllegalArgumentException("Invalid Google Token");
+            if ( gToken == null) throw new InvalidGoogleTokenException("Invalid Google Token");
 
             GoogleIdToken.Payload payload = gToken.getPayload();
             String email = payload.getEmail();
@@ -55,8 +57,10 @@ public class OAuthService {
                 return userRepository.save(newUser);
             });
 
+        } catch (InvalidGoogleTokenException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Google Login Failed: " + e.getMessage());
+            throw new OAuthException("Google Login Failed: " + e.getMessage(), e);
         }
     }
 

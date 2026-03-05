@@ -6,6 +6,7 @@ import com.project.code_judge.Entity.Problem;
 import com.project.code_judge.Entity.Submission;
 import com.project.code_judge.Entity.SubmissionStatus;
 import com.project.code_judge.Entity.User;
+import com.project.code_judge.Exception.*;
 import com.project.code_judge.Repository.SubmissionRepository;
 import com.project.code_judge.Repository.UserRepository;
 import com.project.code_judge.Repository.ProblemRepository;
@@ -29,15 +30,17 @@ public class SubmissionService {
 
     public SubmissionResponse submitCode(Long problemId, String language, String code){
         Problem problem = problemRepository.findById(problemId)
-                .orElseThrow(() -> new RuntimeException("Problem not found"));
+                .orElseThrow(() -> new ProblemNotFoundException("Problem not found with ID: " + problemId));
 
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if(authentication == null || !authentication.isAuthenticated())
-            throw new RuntimeException("User not authenticated");
+            throw new UnauthorizedException("User not authenticated");
 
         String username =  authentication.getName();
 
-        User user = userRepository.findByEmail(username).orElseThrow(() -> new RuntimeException("User not found"));
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + username));
+
         Submission submission = new Submission();
         submission.setCode(code);
         submission.setUser(user);
@@ -56,23 +59,30 @@ public class SubmissionService {
         message.put("problem_id", submission.getProblem().getId());
         message.put("test_case_count", submission.getProblem().getTestCaseCount());
 
-        rabbitTemplate.convertAndSend(RabbitMQConfig.SUBMISSION_QUEUE, message);
-        System.out.println("Sent submission " + savedSubmission.getId() + " to Queue");
+        try {
+            rabbitTemplate.convertAndSend(RabbitMQConfig.SUBMISSION_QUEUE, message);
+            System.out.println("Sent submission " + savedSubmission.getId() + " to Queue");
+        } catch (Exception e) {
+            throw new SubmissionQueueException("Failed to send submission to queue: " + e.getMessage(), e);
+        }
 
         return mapToResponse(savedSubmission);
     }
 
     public SubmissionResponse getSubmission(UUID id){
         Submission submission = submissionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Submission not found"));
+                .orElseThrow(() -> new SubmissionNotFoundException("Submission not found with ID: " + id));
 
         var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if(authentication == null || !authentication.isAuthenticated())
+            throw new UnauthorizedException("User not authenticated");
+
         String username = authentication.getName();
         User user = userRepository.findByEmail(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + username));
 
         if (!submission.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized: You cannot view this submission");
+            throw new InsufficientPermissionException("You do not have permission to view this submission");
         }
 
         return mapToResponse(submission);
