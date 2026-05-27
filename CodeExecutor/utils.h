@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 
-// RAII helper that removes the file when it goes out of scope.
 class ScopedFile {
 public:
     explicit ScopedFile(std::string path) : path_(std::move(path)) {}
@@ -37,7 +36,4 @@ private:
     std::string path_;
 };
 
-// Execute the given command (arguments include program name).
-// If stderr_path is non-null, the child's stderr is redirected to that
-// file. Returns exit status (or -1 on fork/exec failure).
 int run_command(const std::vector<std::string>& args, const std::string* stderr_path = nullptr);

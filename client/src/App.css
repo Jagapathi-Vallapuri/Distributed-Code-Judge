@@ -208,7 +208,6 @@
 
 .sidebar-toggle,
 .drawer-close,
-.copy-btn,
 .error-toggle {
     border: 1px solid rgba(220, 38, 38, 0.3);
     background: rgba(254, 226, 226, 0.6);
@@ -223,12 +222,31 @@
 
 .sidebar-toggle:hover,
 .drawer-close:hover,
-.copy-btn:hover,
 .error-toggle:hover {
     transform: translateY(-1px);
     border-color: rgba(220, 38, 38, 0.5);
     box-shadow: 0 10px 20px rgba(220, 38, 38, 0.14);
     background: rgba(254, 226, 226, 0.8);
+}
+
+.copy-btn {
+    border: 1px solid rgba(148, 163, 184, 0.38);
+    background: rgba(241, 245, 249, 0.82);
+    color: #334155;
+    border-radius: 8px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.copy-btn:hover {
+    transform: translateY(-1px);
+    border-color: rgba(37, 99, 235, 0.5);
+    box-shadow: 0 10px 20px rgba(30, 64, 175, 0.2);
+    background: rgba(219, 234, 254, 0.92);
+    color: #1d4ed8;
 }
 
 .sidebar-toggle {
@@ -767,20 +785,69 @@
 }
 
 .judge-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
     border-radius: 999px;
-    padding: 0.28rem 0.62rem;
-    font-size: 0.78rem;
-    font-weight: 700;
+    padding: 0.38rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.15px;
+    border: 1px solid transparent;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.judge-state-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.92;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25);
+}
+
+.judge-state.queued {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 56%),
+        linear-gradient(135deg, #bfdbfe 0%, #93c5fd 56%, #60a5fa 100%);
+    color: #1d4ed8;
+    border-color: rgba(37, 99, 235, 0.36);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        0 8px 18px rgba(59, 130, 246, 0.2);
 }
 
 .judge-state.running {
-    background: #dbeafe;
-    color: #1d4ed8;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 56%),
+        linear-gradient(135deg, #bae6fd 0%, #7dd3fc 56%, #38bdf8 100%);
+    color: #0369a1;
+    border-color: rgba(3, 105, 161, 0.34);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        0 8px 18px rgba(14, 165, 233, 0.22);
 }
 
 .judge-state.done {
-    background: #dcfce7;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 56%),
+        linear-gradient(135deg, #bbf7d0 0%, #86efac 56%, #4ade80 100%);
     color: #166534;
+    border-color: rgba(22, 101, 52, 0.34);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        0 8px 18px rgba(34, 197, 94, 0.22);
+}
+
+.judge-state.failed {
+    color: #fff4f4;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0) 54%),
+        linear-gradient(135deg, #fb7185 0%, #ef4444 52%, #b91c1c 100%);
+    border-color: rgba(127, 29, 29, 0.45);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.26),
+        0 8px 18px rgba(185, 28, 28, 0.25);
 }
 
 .status-card {
@@ -819,6 +886,56 @@
     color: var(--ink-3);
 }
 
+.status-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.25rem;
+}
+
+.status-pill {
+    border-radius: 999px;
+    padding: 0.2rem 0.58rem;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.status-pill.queued {
+    color: #1d4ed8;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 58%),
+        linear-gradient(135deg, #bfdbfe 0%, #93c5fd 56%, #60a5fa 100%);
+    border-color: rgba(37, 99, 235, 0.34);
+}
+
+.status-pill.running {
+    color: #0369a1;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 58%),
+        linear-gradient(135deg, #bae6fd 0%, #7dd3fc 56%, #38bdf8 100%);
+    border-color: rgba(3, 105, 161, 0.32);
+}
+
+.status-pill.done {
+    color: #166534;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 58%),
+        linear-gradient(135deg, #bbf7d0 0%, #86efac 56%, #4ade80 100%);
+    border-color: rgba(22, 101, 52, 0.3);
+}
+
+.status-pill.failed {
+    color: #fff4f4;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 58%),
+        linear-gradient(135deg, #fb7185 0%, #ef4444 52%, #b91c1c 100%);
+    border-color: rgba(127, 29, 29, 0.38);
+}
+
 .status-summary {
     display: flex;
     align-items: center;
@@ -831,16 +948,32 @@
     padding: 0.4rem 0.85rem;
     font-weight: 800;
     letter-spacing: 0.15px;
+    border: 1px solid transparent;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 .verdict.ok {
-    color: var(--ok);
-    background: linear-gradient(135deg, var(--ok-bg), #bbf7d0);
+    color: #f4fff8;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 52%),
+        linear-gradient(135deg, #34d399 0%, #22c55e 52%, #15803d 100%);
+    border-color: rgba(20, 83, 45, 0.42);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.24),
+        0 8px 18px rgba(22, 163, 74, 0.24);
+    text-shadow: 0 1px 0 rgba(20, 83, 45, 0.4);
 }
 
 .verdict.bad {
-    color: var(--bad);
-    background: linear-gradient(135deg, var(--bad-bg), #fecaca);
+    color: #fff7f7;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0) 52%),
+        linear-gradient(135deg, #fb7185 0%, #ef4444 52%, #b91c1c 100%);
+    border: 1px solid rgba(127, 29, 29, 0.45);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.24),
+        0 8px 18px rgba(185, 28, 28, 0.25);
+    text-shadow: 0 1px 0 rgba(127, 29, 29, 0.45);
 }
 
 .status-error,
@@ -1153,4 +1286,3 @@
 .panel {
     animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-

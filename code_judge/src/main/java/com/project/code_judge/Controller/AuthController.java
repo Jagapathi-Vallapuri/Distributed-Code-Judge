@@ -10,15 +10,18 @@ import com.project.code_judge.Service.AuthService;
 import com.project.code_judge.Service.OAuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import jakarta.transaction.Transactional;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
@@ -35,9 +38,31 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final OAuthService oAuthService;
 
+    @GetMapping("/me")
+    public ResponseEntity<Map<String, Object>> me(HttpServletRequest request){
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean authenticated = authentication != null
+                && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken);
+
+        return ResponseEntity.ok(Map.of(
+                "authenticated", authenticated,
+                "principal", authenticated ? authentication.getName() : null,
+                "sessionId", request.getSession(false) != null ? request.getSession(false).getId() : null
+        ));
+    }
+
+    @GetMapping("/csrf")
+    public ResponseEntity<Map<String, String>> csrf(CsrfToken csrfToken){
+        return ResponseEntity.ok(Map.of(
+                "token", csrfToken.getToken(),
+                "headerName", csrfToken.getHeaderName()
+        ));
+    }
+
     @PostMapping("/register")
     @Transactional
-    public ResponseEntity<UserResponse> registerUser(@RequestBody RegisterUser dto, HttpServletRequest request){
+    public ResponseEntity<UserResponse> registerUser(@Valid @RequestBody RegisterUser dto, HttpServletRequest request){
         UserResponse userResponse = authService.registerUser(dto);
         Authentication auth = authService.authenticate(
                 new UserLogin(dto.getEmail(), dto.getPassword())
@@ -52,7 +77,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody UserLogin dto, HttpServletRequest request){
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody UserLogin dto, HttpServletRequest request){
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
         );

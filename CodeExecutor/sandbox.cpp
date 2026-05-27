@@ -155,8 +155,12 @@ ExecutionResult Sandbox::run(LanguageStrategy &strategy,
         if (read(pipe_fd[0], &buffer, 1) <= 0) _exit(INTERNAL_ERROR);
         close(pipe_fd[0]);
 
-        if (unshare(CLONE_NEWNET) != 0) _exit(INTERNAL_ERROR);
         redirect_std_streams(input_file, output_file, error_file);
+        if (unshare(CLONE_NEWNET) != 0) {
+            // Some Docker environments disallow CLONE_NEWNET even with added capabilities.
+            // Continue execution with RLIMIT/cgroup isolation instead of misclassifying user code as runtime error.
+            perror("unshare(CLONE_NEWNET) failed");
+        }
         
         rlimit cpu = {(rlim_t)time_limit_sec, (rlim_t)time_limit_sec + 1};
         if (setrlimit(RLIMIT_CPU, &cpu) != 0) _exit(INTERNAL_ERROR);

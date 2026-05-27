@@ -2,6 +2,7 @@ package com.project.code_judge.Controller;
 
 import com.project.code_judge.Entity.Problem;
 import com.project.code_judge.Service.ProblemService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,7 +20,7 @@ public class ProblemController {
 
 
     @PostMapping("/admin/problems")
-    public ResponseEntity<Problem> createProblem(@RequestBody CreateProblem dto){
+    public ResponseEntity<Problem> createProblem(@Valid @RequestBody CreateProblem dto){
         Problem created = problemService.createProblem(dto);
         return ResponseEntity.ok(created);
     }

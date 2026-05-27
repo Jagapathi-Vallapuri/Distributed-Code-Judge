@@ -146,7 +146,6 @@ Create a problem:
 ```bash
 curl -X POST http://localhost:8080/api/admin/problems \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token>" \
   -d '{
     "title": "Sample: Add One",
     "description": "Read an integer and output x + 1.",
@@ -161,7 +160,6 @@ Upload test cases for `problemId=1`:
 
 ```bash
 curl -X POST http://localhost:8080/api/admin/problems/1/testcases \
-  -H "Authorization: Bearer <token>" \
   -F "file=@/path/to/testcases.zip"
 ```
 
@@ -180,13 +178,14 @@ From the repo root:
 - Ensure you have an appropriate `.env` file (e.g., `VITE_GOOGLE_CLIENT_ID` for Google login).
 - `npm run dev`
 
-The backend enables CORS for `http://localhost:5173` (see `@CrossOrigin` in the submission controller).
+The backend allows CORS from `http://localhost:5173` (configured in `SecurityConfig`).
 
 ## API
 
 ### Authentication
 
-All endpoints except `/api/auth/**` require a JWT bearer token in the `Authorization` header.
+Authentication is session-based (`JSESSIONID` cookie), not JWT-based.
+The frontend should use `withCredentials: true` for API calls.
 
 **Register a new user:**
 - `POST http://localhost:8080/api/auth/register`
@@ -196,7 +195,7 @@ All endpoints except `/api/auth/**` require a JWT bearer token in the `Authoriza
 **Login:**
 - `POST http://localhost:8080/api/auth/login`
 - Request body: `{ "email": "...", "password": "..." }`
-- Response: `{ "token": "...", "username": "..." }`
+- Response: `{ "username": "...", "email": "..." }`
 
 Example:
 ```bash
@@ -208,10 +207,14 @@ curl -X POST http://localhost:8080/api/auth/login \
   }'
 ```
 
-Use the returned `token` as a Bearer token for all protected endpoints:
+Check current session auth state:
 ```bash
-curl -H "Authorization: Bearer <token>" http://localhost:8080/api/...
+curl -b cookies.txt -c cookies.txt http://localhost:8080/api/auth/me
 ```
+
+CSRF flow for mutating requests (`POST`, `PUT`, `PATCH`, `DELETE`):
+1. Call `GET /api/auth/csrf` to prime CSRF cookie (`XSRF-TOKEN`)
+2. Send `X-XSRF-TOKEN` header with the token value on mutating API requests
 
 ### Problems
 
@@ -225,7 +228,7 @@ curl -H "Authorization: Bearer <token>" http://localhost:8080/api/...
 
 **Create a problem (admin):**
 - `POST /api/admin/problems`
-- **Note:** Currently unrestricted. Should be protected with admin role.
+- **Note:** Currently open/unrestricted for local development convenience.
 - Request body:
   ```json
   {
@@ -240,7 +243,7 @@ curl -H "Authorization: Bearer <token>" http://localhost:8080/api/...
 
 **Upload test cases (admin):**
 - `POST /api/admin/problems/{id}/testcases`
-- **Note:** Currently unrestricted. Should be protected with admin role.
+- **Note:** Currently open/unrestricted for local development convenience.
 - Multipart form data: `file` = zip archive
 - Zip must contain files named: `1_in.txt`, `1_out.txt`, `2_in.txt`, `2_out.txt`, etc.
 - Files are extracted to the directory configured in `application.properties` (default: `./judge_data`)
@@ -275,11 +278,13 @@ curl -H "Authorization: Bearer <token>" http://localhost:8080/api/...
   }
   ```
 - Possible verdicts: `ACCEPTED`, `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED`, `RUNTIME_ERROR`, `COMPILATION_ERROR`, `INTERNAL_ERROR`
-- Possible statuses: `PENDING`, `COMPLETED`
+- Possible statuses: `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`
 
 ## Load Testing
 
 The [stress_test.py](stress_test.py) script simulates multiple concurrent users submitting code to test the system under load.
+
+> Note: With CSRF enabled on `/api/submissions`, this script must include CSRF bootstrap (`/api/auth/csrf`) and `X-XSRF-TOKEN` header propagation for mutating requests.
 
 **Setup:**
 ```bash
@@ -469,18 +474,20 @@ The script logs submission metrics, RabbitMQ queue depth, and system performance
 
 ### Authentication & Authorization
 
-- Authentication uses JWT bearer tokens in the `Authorization` header
-- All endpoints except `/api/auth/**` require a valid JWT token
-- JWT secret and expiration are configured in [code_judge/src/main/resources/application.properties](code_judge/src/main/resources/application.properties)
-- The username is extracted from the JWT principal (any username in request body is ignored)
+- Authentication is session-based using `JSESSIONID` cookie
+- CSRF protection is enabled with `XSRF-TOKEN` cookie + `X-XSRF-TOKEN` header
+- Auth helper endpoints:
+  - `GET /api/auth/me` — current session/auth principal
+  - `GET /api/auth/csrf` — CSRF token bootstrap
+- The authenticated principal is the session user email
 
 ### Admin Endpoints
 
-Currently, admin endpoints (`/api/admin/**`) do **not** enforce role-based access control. Any authenticated user can:
+Currently, admin endpoints (`/api/admin/**`) are intentionally open for local development. Any caller can:
 - Create problems
 - Upload test cases
 
-**Future improvement:** Add `@PreAuthorize("hasRole('ADMIN')")` to the controllers and implement role checking in the JWT token.
+**Future improvement:** Add role-based access control (e.g., `@PreAuthorize("hasRole('ADMIN')")`).
 
 ### Job Processing Flow
 
@@ -512,7 +519,7 @@ Configuration is read from [code_judge/src/main/resources/application.properties
 - Database connection (PostgreSQL)
 - Redis connection (for session storage and rate limiting)
 - RabbitMQ connection
-- JWT secret and expiration
+- Session cookie + CSRF behavior
 - CORS allowed origins
 - File upload path for test cases
 - OAuth2 configuration (Google Client ID and Secret)

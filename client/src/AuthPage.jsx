@@ -3,6 +3,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { loginUser, registerUser, googleLogin } from "./api";
 import { getStoredAuth, setStoredAuth } from "./auth";
 
+const getGoogleWindowState = () => {
+    if (typeof window === "undefined") return {};
+    if (!window.__googleAuthState) {
+        window.__googleAuthState = { initializedClientId: null };
+    }
+    return window.__googleAuthState;
+};
+
 function AuthPage({ mode }) {
     const isLogin = mode === "login";
     const navigate = useNavigate();
@@ -79,14 +87,19 @@ function AuthPage({ mode }) {
         };
 
         if (window.google && window.google.accounts && window.google.accounts.id) {
-            window.google.accounts.id.initialize({
-                client_id: clientId,
-                callback: handleCredentialResponse,
-            });
+            const gState = getGoogleWindowState();
+            if (gState.initializedClientId !== clientId) {
+                window.google.accounts.id.initialize({
+                    client_id: clientId,
+                    callback: handleCredentialResponse,
+                });
+                gState.initializedClientId = clientId;
+            }
 
             // Render button into our container if present
             const container = document.getElementById("google-signin-button");
             if (container) {
+                container.innerHTML = "";
                 window.google.accounts.id.renderButton(container, { theme: "outline", size: "large" });
             }
         }

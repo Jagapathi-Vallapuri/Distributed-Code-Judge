@@ -26,6 +26,13 @@ const monacoLanguageMap = {
     java: "java",
 };
 
+const statusVisuals = {
+    PENDING: { label: "Queued", tone: "queued" },
+    RUNNING: { label: "Running", tone: "running" },
+    COMPLETED: { label: "Completed", tone: "done" },
+    FAILED: { label: "Failed", tone: "failed" },
+};
+
 const basicRefactor = (sourceCode) => {
     const normalized = sourceCode
         .replace(/\r\n?/g, "\n")
@@ -304,6 +311,10 @@ function App() {
 
     const shortSubmissionId = submissionState.id ? `${submissionState.id.substring(0, 8)}...` : "-";
     const hasTerminalStatus = submissionState.status === "COMPLETED" || submissionState.status === "FAILED";
+    const statusVisual = statusVisuals[submissionState.status] || {
+        label: submissionState.status || "Unknown",
+        tone: "queued",
+    };
     const difficulty = selectedProblem?.difficulty || "UNKNOWN";
     const difficultyTone = String(difficulty).toLowerCase();
     const filteredProblems = useMemo(() => {
@@ -504,8 +515,9 @@ function App() {
                                 {submissionState.loading ? "Judging..." : "Submit Solution"}
                             </button>
                             {submissionState.status && (
-                                <span className={`judge-state ${hasTerminalStatus ? "done" : "running"}`}>
-                                    {hasTerminalStatus ? "Latest run completed" : "Judging in progress"}
+                                <span className={`judge-state ${statusVisual.tone}`}>
+                                    <span className="judge-state-dot" />
+                                    {statusVisual.label}
                                 </span>
                             )}
                         </div>
@@ -547,7 +559,10 @@ function App() {
                                 <div className="status-card-header">
                                     <div>
                                         <div><strong>ID:</strong> {shortSubmissionId}</div>
-                                        <div><strong>Status:</strong> {submissionState.status}</div>
+                                        <div className="status-line">
+                                            <strong>Status:</strong>
+                                            <span className={`status-pill ${statusVisual.tone}`}>{statusVisual.label}</span>
+                                        </div>
                                     </div>
                                     <div className="status-actions">
                                         {submissionState.id && (

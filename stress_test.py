@@ -11,6 +11,7 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8080")
 API_URL = os.getenv("API_URL", f"{API_BASE_URL}/api/submissions")
 AUTH_LOGIN_URL = os.getenv("AUTH_LOGIN_URL", f"{API_BASE_URL}/api/auth/login")
 AUTH_REGISTER_URL = os.getenv("AUTH_REGISTER_URL", f"{API_BASE_URL}/api/auth/register")
+AUTH_CSRF_URL = os.getenv("AUTH_CSRF_URL", f"{API_BASE_URL}/api/auth/csrf")
 PROBLEM_ID = int(os.getenv("PROBLEM_ID", "1"))
 USERS = int(os.getenv("USERS", "5"))
 CONCURRENCY = int(os.getenv("CONCURRENCY", "10"))
@@ -128,11 +129,47 @@ CASE_WEIGHTS = {
     "compile_error": 0.10,
 }
 
+CSRF_COOKIE_NAME = "XSRF-TOKEN"
+CSRF_HEADER_NAME = "X-XSRF-TOKEN"
+
 
 def pick_case():
     cases = list(CASE_WEIGHTS.keys())
     weights = list(CASE_WEIGHTS.values())
     return random.choices(cases, weights=weights, k=1)[0]
+
+
+def get_csrf_token(session):
+    return session.cookies.get(CSRF_COOKIE_NAME)
+
+
+def ensure_csrf(session):
+    token = get_csrf_token(session)
+    if token:
+        return token
+
+    resp = session.get(AUTH_CSRF_URL, timeout=10)
+    if resp.status_code != 200:
+        return None
+
+    token = get_csrf_token(session)
+    if token:
+        return token
+
+    try:
+        token = resp.json().get("token")
+    except Exception:
+        token = None
+    return token
+
+
+def csrf_headers(session):
+    token = get_csrf_token(session)
+    if not token:
+        token = ensure_csrf(session)
+    if not token:
+        return {}
+    return {CSRF_HEADER_NAME: token}
 
 
 def submit_job(session, api_url, problem_id, language, case_name, code):
@@ -143,7 +180,10 @@ def submit_job(session, api_url, problem_id, language, case_name, code):
     }
 
     start = time.time()
-    response = session.post(api_url, json=payload, timeout=15)
+    response = session.post(api_url, json=payload, headers=csrf_headers(session), timeout=15)
+    if response.status_code == 403 and "Invalid CSRF Token" in response.text:
+        ensure_csrf(session)
+        response = session.post(api_url, json=payload, headers=csrf_headers(session), timeout=15)
     latency_ms = int((time.time() - start) * 1000)
 
     if response.status_code != 200:
@@ -163,14 +203,14 @@ def submit_job(session, api_url, problem_id, language, case_name, code):
     }
 
 
-def login_and_get_token(session):
+def login_session(session):
     login_payload = {
         "email": AUTH_EMAIL,
         "password": AUTH_PASSWORD,
     }
     resp = session.post(AUTH_LOGIN_URL, json=login_payload, timeout=10)
     if resp.status_code == 200:
-        return resp.json().get("token")
+        return True
 
     if AUTO_REGISTER:
         register_payload = {
@@ -180,13 +220,13 @@ def login_and_get_token(session):
         }
         reg_resp = session.post(AUTH_REGISTER_URL, json=register_payload, timeout=10)
         if reg_resp.status_code not in (200, 201):
-            return None
+            return False
 
         resp = session.post(AUTH_LOGIN_URL, json=login_payload, timeout=10)
         if resp.status_code == 200:
-            return resp.json().get("token")
+            return True
 
-    return None
+    return False
 
 
 def poll_status(session, api_url, submission_id, poll_interval, timeout_sec):
@@ -197,7 +237,7 @@ def poll_status(session, api_url, submission_id, poll_interval, timeout_sec):
             return {"ok": False, "error": f"HTTP {resp.status_code}: {resp.text}"}
 
         data = resp.json()
-        if data.get("status") == "COMPLETED":
+        if data.get("status") in ("COMPLETED", "FAILED"):
             return {
                 "ok": True,
                 "verdict": data.get("verdict"),
@@ -213,6 +253,7 @@ def run_stress_test():
     print("--- STARTING STRESS TEST ---")
     print(f"API: {API_URL}")
     print(f"Auth login: {AUTH_LOGIN_URL}")
+    print(f"Auth csrf: {AUTH_CSRF_URL}")
     print(f"Problem ID: {PROBLEM_ID}")
     print(f"Users: {USERS}")
     print(f"Concurrency: {CONCURRENCY}")
@@ -232,11 +273,15 @@ def run_stress_test():
     end_time = start_time + DURATION_SEC
 
     with requests.Session() as session:
-        token = login_and_get_token(session)
-        if not token:
-            print("[ERROR] Could not obtain auth token. Check credentials or disable AUTO_REGISTER.")
+        logged_in = login_session(session)
+        if not logged_in:
+            print("[ERROR] Could not establish session. Check credentials or disable AUTO_REGISTER.")
             return
-        session.headers.update({"Authorization": f"Bearer {token}"})
+
+        csrf = ensure_csrf(session)
+        if not csrf:
+            print("[ERROR] Could not obtain CSRF token from /api/auth/csrf.")
+            return
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENCY) as executor:
             futures = set()

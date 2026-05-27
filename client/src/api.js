@@ -6,6 +6,45 @@ const api = axios.create({
         "Content-Type": "application/json",
     },
     withCredentials: true,
+    withXSRFToken: true,
+    xsrfCookieName: "XSRF-TOKEN",
+    xsrfHeaderName: "X-XSRF-TOKEN",
+});
+
+let csrfReadyPromise = null;
+
+const readCookie = (name) => {
+    if (typeof document === "undefined") return null;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
+    return match ? decodeURIComponent(match[1]) : null;
+};
+
+const ensureCsrfToken = async () => {
+    if (!csrfReadyPromise) {
+        csrfReadyPromise = api.get("/auth/csrf").catch((error) => {
+            csrfReadyPromise = null;
+            throw error;
+        });
+    }
+    return csrfReadyPromise;
+};
+
+api.interceptors.request.use(async (config) => {
+    const method = (config.method || "get").toLowerCase();
+    const shouldPrimeCsrf = ["post", "put", "patch", "delete"].includes(method)
+        && config.url !== "/auth/csrf";
+
+    if (shouldPrimeCsrf) {
+        await ensureCsrfToken();
+        const token = readCookie("XSRF-TOKEN");
+        if (token) {
+            config.headers = config.headers || {};
+            config.headers["X-XSRF-TOKEN"] = token;
+        }
+    }
+
+    return config;
 });
 
 export const getProblems = async () => {
