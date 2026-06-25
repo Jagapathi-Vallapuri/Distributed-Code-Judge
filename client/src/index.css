@@ -1,9 +1,9 @@
 :root {
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family: "Space Grotesk", "Inter", "Segoe UI", sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #f1f5f9;
-  background-color: #020617;
+  color: #f7f3ea;
+  background-color: #06101c;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -18,16 +18,16 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(1200px 600px at -10% -10%, rgba(59, 130, 246, 0.15), transparent 70%),
-    radial-gradient(900px 500px at 110% 10%, rgba(139, 92, 246, 0.12), transparent 68%),
-    radial-gradient(1000px 550px at 50% 120%, rgba(16, 185, 129, 0.08), transparent 80%),
-    #050b14;
-  color: #f8fafc;
-  font-family: "Inter", sans-serif;
+    radial-gradient(900px 520px at -10% 0%, rgba(245, 158, 11, 0.16), transparent 68%),
+    radial-gradient(760px 480px at 110% 4%, rgba(56, 189, 248, 0.14), transparent 65%),
+    radial-gradient(900px 520px at 50% 120%, rgba(234, 88, 12, 0.12), transparent 72%),
+    linear-gradient(180deg, #06101c 0%, #091523 48%, #0a1320 100%);
+  color: #f7f3ea;
+  font-family: "Space Grotesk", "Inter", sans-serif;
 }
 
 h1, h2, h3, h4, h5, h6, .brand {
-  font-family: "Outfit", sans-serif;
+  font-family: "Sora", "Outfit", sans-serif;
 }
 
 a {
@@ -36,7 +36,7 @@ a {
 }
 
 ::selection {
-  background: rgba(59, 130, 246, 0.35);
+  background: rgba(245, 158, 11, 0.35);
   color: #fff;
 }
 

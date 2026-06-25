@@ -13,6 +13,7 @@ import {
 } from "./api";
 import "./App.css";
 import { clearStoredAuth, getStoredAuth } from "./auth";
+import { upsertSubmissionHistoryEntry } from "./submissionHistory";
 
 const templates = {
     cpp: `#include <bits/stdc++.h>\n\nint main() {\n    int x;\n    std::cin >> x;\n    std::cout << x + 1;\n    return 0;\n}`,
@@ -60,9 +61,11 @@ function App() {
         error: "",
         timeTaken: null,
         memoryUsed: null,
+        historyContext: null,
     });
     const [auth, setAuth] = useState(() => getStoredAuth());
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [problemBriefOpen, setProblemBriefOpen] = useState(true);
     const [showError, setShowError] = useState(false);
     const [copyMessage, setCopyMessage] = useState("");
     const [editorMessage, setEditorMessage] = useState("");
@@ -162,6 +165,12 @@ function App() {
             }));
             return;
         }
+        const historyContext = {
+            problemId: selectedProblemId,
+            problemTitle: selectedProblem?.title || `Problem ${selectedProblemId}`,
+            language,
+            submittedAt: new Date().toISOString(),
+        };
         setSubmissionState((prev) => ({
             ...prev,
             loading: true,
@@ -171,6 +180,7 @@ function App() {
             timeTaken: null,
             memoryUsed: null,
             id: null,
+            historyContext,
         }));
 
         try {
@@ -180,6 +190,21 @@ function App() {
                 code,
             });
             const id = submission?.id || null;
+
+            if (id) {
+                upsertSubmissionHistoryEntry({
+                    id,
+                    ...historyContext,
+                    status: submission?.status || "PENDING",
+                    verdict: submission?.verdict || "",
+                    timeTaken: submission?.timeTaken ?? null,
+                    memoryUsed: submission?.memoryUsed ?? null,
+                    error: submission?.error || "",
+                    submittedAt: submission?.submissionTime || historyContext.submittedAt,
+                    updatedAt: historyContext.submittedAt,
+                });
+            }
+
             setSubmissionState((prev) => ({
                 ...prev,
                 id,
@@ -189,6 +214,7 @@ function App() {
                 timeTaken: submission?.timeTaken ?? null,
                 memoryUsed: submission?.memoryUsed ?? null,
                 loading: id ? prev.loading : false,
+                historyContext,
             }));
         } catch (error) {
             setSubmissionState((prev) => ({
@@ -217,6 +243,17 @@ function App() {
                     timeTaken: result?.timeTaken ?? null,
                     memoryUsed: result?.memoryUsed ?? null,
                 }));
+
+                upsertSubmissionHistoryEntry({
+                    id: submissionState.id,
+                    ...(submissionState.historyContext || {}),
+                    status: result?.status || "",
+                    verdict: result?.verdict || "",
+                    timeTaken: result?.timeTaken ?? null,
+                    memoryUsed: result?.memoryUsed ?? null,
+                    error: result?.error || "",
+                    updatedAt: new Date().toISOString(),
+                });
 
                 if (result?.status === "COMPLETED" || result?.status === "FAILED") {
                     setSubmissionState((prev) => ({
@@ -360,6 +397,7 @@ function App() {
                 </div>
 
                 <div className="auth-bar">
+                    <Link className="history-link" to="/history">History</Link>
                     {auth?.username ? (
                         <>
                             <span className="auth-user">Signed in as <strong>{auth.username}</strong></span>
@@ -374,243 +412,304 @@ function App() {
                 </div>
             </header>
 
-            <div className="layout">
+            <div className={`layout ${sidebarOpen ? "" : "list-collapsed"}`}>
                 <div className="left-rail">
-                    <div className="drawer-toggle-row">
-                        <button
-                            className={`sidebar-toggle ${sidebarOpen ? "open" : "closed"}`}
-                            type="button"
-                            onClick={() => setSidebarOpen((prev) => !prev)}
-                            aria-expanded={sidebarOpen}
-                            aria-label={sidebarOpen ? "Hide problem list" : "Show problem list"}
-                        >
-                            <span className="sidebar-toggle-icon" aria-hidden>{sidebarOpen ? "◂" : "▸"}</span>
-                            <span className="sidebar-toggle-text">{sidebarOpen ? "Hide Problems" : "Show Problems"}</span>
-                            <span className="sidebar-toggle-count">{problems.length}</span>
-                        </button>
-                    </div>
+                    {sidebarOpen ? (
+                        <div className={`problem-drawer-wrap ${sidebarOpen ? "open" : "closed"}`} aria-hidden={!sidebarOpen}>
+                            <aside className="panel sidebar drawer">
+                                <div className="drawer-header">
+                                    <div>
+                                        <p className="section-eyebrow">Problem Library</p>
+                                        <h2 className="sidebar-title">All Problems</h2>
+                                    </div>
+                                    <button
+                                        className="panel-toggle"
+                                        type="button"
+                                        onClick={() => setSidebarOpen(false)}
+                                        aria-expanded={sidebarOpen}
+                                        aria-label="Minimize problem list"
+                                    >
+                                        <span aria-hidden>◂</span>
+                                        <span>Minimize</span>
+                                    </button>
+                                </div>
 
-                    <div className={`problem-drawer-wrap ${sidebarOpen ? "open" : "closed"}`} aria-hidden={!sidebarOpen}>
-                        <aside className="panel sidebar drawer">
-                            <div className="drawer-header">
-                                <h2 className="sidebar-title">All Problems</h2>
-                                <button
-                                    className="drawer-close"
-                                    type="button"
-                                    onClick={() => setSidebarOpen(false)}
-                                    aria-label="Close problem list"
-                                >
-                                    Close
-                                </button>
-                            </div>
+                                <div className="problem-tools">
+                                    <input
+                                        className="problem-search"
+                                        type="text"
+                                        value={problemQuery}
+                                        onChange={(event) => setProblemQuery(event.target.value)}
+                                        placeholder="Search title, difficulty..."
+                                        aria-label="Search problems"
+                                    />
+                                    <span className="problem-counter">Showing {filteredProblems.length} / {problems.length}</span>
+                                </div>
 
-                            <div className="problem-tools">
-                                <input
-                                    className="problem-search"
-                                    type="text"
-                                    value={problemQuery}
-                                    onChange={(event) => setProblemQuery(event.target.value)}
-                                    placeholder="Search title, difficulty..."
-                                    aria-label="Search problems"
-                                />
-                                <span className="problem-counter">Showing {filteredProblems.length} / {problems.length}</span>
-                            </div>
+                                {problemsLoading && <p>Loading problems...</p>}
+                                {problemsError && <p className="status-error">{problemsError}</p>}
 
-                            {problemsLoading && <p>Loading problems...</p>}
-                            {problemsError && <p className="status-error">{problemsError}</p>}
-
-                            <div className="problem-list">
-                                {filteredProblems.map((problem, index) => {
-                                    const tone = String(problem.difficulty || "unknown").toLowerCase();
-                                    return (
-                                        <div
-                                            key={problem.id}
-                                            className={`problem-card ${selectedProblemId === problem.id ? "active" : ""}`}
-                                            style={{ "--anim-index": index }}
-                                            onClick={() => {
-                                                setSelectedProblemId(problem.id);
-                                            }}
-                                            role="button"
-                                            tabIndex={0}
-                                            onKeyDown={(event) => {
-                                                if (event.key === "Enter") {
+                                <div className="problem-list">
+                                    {filteredProblems.map((problem, index) => {
+                                        const tone = String(problem.difficulty || "unknown").toLowerCase();
+                                        return (
+                                            <div
+                                                key={problem.id}
+                                                className={`problem-card ${selectedProblemId === problem.id ? "active" : ""}`}
+                                                style={{ "--anim-index": index }}
+                                                onClick={() => {
                                                     setSelectedProblemId(problem.id);
-                                                }
-                                            }}
-                                        >
-                                            <div className="problem-row">
-                                                <h3>{problem.title}</h3>
-                                                <span className="problem-index">{String(index + 1).padStart(2, "0")}</span>
+                                                }}
+                                                role="button"
+                                                tabIndex={0}
+                                                onKeyDown={(event) => {
+                                                        if (event.key === "Enter" || event.key === " ") {
+                                                            event.preventDefault();
+                                                        setSelectedProblemId(problem.id);
+                                                    }
+                                                }}
+                                            >
+                                                <div className="problem-row">
+                                                    <h3>{problem.title}</h3>
+                                                    <span className="problem-index">{String(index + 1).padStart(2, "0")}</span>
+                                                </div>
+                                                <div className="problem-meta">
+                                                    {problem.difficulty && <span className={`pill ${tone}`}>{problem.difficulty}</span>}
+                                                    {problem.testCaseCount != null && <span className="pill neutral">{problem.testCaseCount} tests</span>}
+                                                    {problem.timeLimitSeconds != null && <span className="pill neutral">{problem.timeLimitSeconds}s</span>}
+                                                </div>
                                             </div>
-                                            <div className="problem-meta">
-                                                {problem.difficulty && <span className={`pill ${tone}`}>{problem.difficulty}</span>}
-                                                {problem.testCaseCount != null && <span className="pill neutral">{problem.testCaseCount} tests</span>}
-                                                {problem.timeLimitSeconds != null && <span className="pill neutral">{problem.timeLimitSeconds}s</span>}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                                {!problemsLoading && filteredProblems.length === 0 && (
-                                    <div className="problem-list-empty">No problems match your search.</div>
-                                )}
-                            </div>
-                        </aside>
-                    </div>
+                                        );
+                                    })}
+                                    {!problemsLoading && filteredProblems.length === 0 && (
+                                        <div className="problem-list-empty">No problems match your search.</div>
+                                    )}
+                                </div>
+                            </aside>
+                        </div>
+                    ) : (
+                        <div className="panel list-collapsed-card">
+                            <button
+                                className="collapsed-panel-button"
+                                type="button"
+                                onClick={() => setSidebarOpen(true)}
+                                aria-expanded={sidebarOpen}
+                                aria-label="Show problem list"
+                            >
+                                <span className="collapsed-panel-icon" aria-hidden>▸</span>
+                                <span className="collapsed-panel-label">Problems</span>
+                                <span className="collapsed-panel-count">{problems.length}</span>
+                            </button>
+                        </div>
+                    )}
 
                 </div>
 
-                <main className="content">
-                    <section className="panel code-panel">
-                        <div className="studio-head">
-                            <h2 className="studio-title">Code Workspace</h2>
-                            <p className="studio-copy">Write your solution and submit when ready.</p>
-                        </div>
-
-                        <div className="form-row">
-                            <div className="form-field">
-                                <label htmlFor="language">Language</label>
-                                <select
-                                    id="language"
-                                    value={language}
-                                    onChange={(event) => setLanguage(event.target.value)}
-                                >
-                                    <option value="cpp">C++</option>
-                                    <option value="python">Python 3</option>
-                                    <option value="java">Java</option>
-                                </select>
+                <main className="workspace-main">
+                    <section className={`panel problem-hero ${problemBriefOpen ? "" : "brief-collapsed"}`}>
+                        <div className="problem-hero-bar">
+                            <div className="detail-header">
+                                <div>
+                                    <p className="section-eyebrow">Problem Brief</p>
+                                    <h2>{selectedProblem?.title || "Select a problem"}</h2>
+                                </div>
+                                <div className="hero-actions">
+                                    <span className={`badge ${difficultyTone}`}>{difficulty}</span>
+                                    <button
+                                        className="panel-toggle"
+                                        type="button"
+                                        onClick={() => setProblemBriefOpen((prev) => !prev)}
+                                        aria-expanded={problemBriefOpen}
+                                        aria-label={problemBriefOpen ? "Hide problem brief" : "Show problem brief"}
+                                    >
+                                        <span aria-hidden>{problemBriefOpen ? "▴" : "▾"}</span>
+                                        <span>{problemBriefOpen ? "Hide Brief" : "Show Brief"}</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="editor-toolbar" role="toolbar" aria-label="Code editor actions">
-                            <button className="tool-btn" type="button" onClick={handleRefactor}>Refactor</button>
-                            <button className="tool-btn ghost" type="button" onClick={handleResetCode}>Reset</button>
-                            {editorMessage && <span className="editor-message">{editorMessage}</span>}
-                        </div>
+                        {problemBriefOpen && (
+                            <>
+                                <div className="problem-hero-copy">
+                                    <div className="problem-markdown">
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkMath]}
+                                            rehypePlugins={[rehypeKatex]}
+                                        >
+                                            {selectedProblem?.description || "Choose a problem from the list to view its statement."}
+                                        </ReactMarkdown>
+                                    </div>
+                                </div>
 
-                        <div className="editor-shell">
-                            <Editor
-                                height="600px"
-                                language={monacoLanguageMap[language] || "plaintext"}
-                                value={code}
-                                onChange={(value) => setCode(value || "")}
-                                onMount={handleEditorMount}
-                                theme="vs-dark"
-                                options={{
-                                    minimap: { enabled: false },
-                                    fontSize: 14,
-                                    lineNumbers: "on",
-                                    smoothScrolling: true,
-                                    padding: { top: 10, bottom: 10 },
-                                    automaticLayout: true,
-                                    tabSize: 4,
-                                    insertSpaces: true,
-                                    formatOnPaste: true,
-                                    formatOnType: true,
-                                }}
-                            />
-                        </div>
-
-                        <div className="action-row">
-                            <button className="submit-btn" onClick={handleSubmit} disabled={submissionState.loading}>
-                                {submissionState.loading ? "Judging..." : "Submit Solution"}
-                            </button>
-                            {submissionState.status && (
-                                <span className={`judge-state ${statusVisual.tone}`}>
-                                    <span className="judge-state-dot" />
-                                    {statusVisual.label}
-                                </span>
-                            )}
-                        </div>
-
+                                <div className="problem-hero-meta">
+                                    <div className="meta-card">
+                                        <span className="meta-label">Difficulty</span>
+                                        <strong>{selectedProblem?.difficulty || "Unknown"}</strong>
+                                    </div>
+                                    <div className="meta-card">
+                                        <span className="meta-label">Time Limit</span>
+                                        <strong>{selectedProblem?.timeLimitSeconds != null ? `${selectedProblem.timeLimitSeconds}s` : "N/A"}</strong>
+                                    </div>
+                                    <div className="meta-card">
+                                        <span className="meta-label">Memory</span>
+                                        <strong>{selectedProblem?.memoryLimitMb != null ? `${selectedProblem.memoryLimitMb} MB` : "N/A"}</strong>
+                                    </div>
+                                    <div className="meta-card">
+                                        <span className="meta-label">Test Cases</span>
+                                        <strong>{selectedProblem?.testCaseCount != null ? selectedProblem.testCaseCount : "N/A"}</strong>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </section>
-                </main>
 
-                <aside className="side-panel">
-                    <div className="problem-detail">
-                        <div className="detail-header">
-                            <h2>{selectedProblem?.title || "Select a problem"}</h2>
-                            <span className={`badge ${difficultyTone}`}>{difficulty}</span>
-                        </div>
-                        <div className="problem-markdown">
-                            <ReactMarkdown
-                                remarkPlugins={[remarkMath]}
-                                rehypePlugins={[rehypeKatex]}
-                            >
-                                {selectedProblem?.description || "Choose a problem from the list to view its statement."}
-                            </ReactMarkdown>
-                        </div>
-                        <div className="detail-meta">
-                            {selectedProblem?.difficulty && <span>Difficulty: {selectedProblem.difficulty}</span>}
-                            {selectedProblem?.timeLimitSeconds != null && (
-                                <span>Time Limit: {selectedProblem.timeLimitSeconds}s</span>
-                            )}
-                            {selectedProblem?.memoryLimitMb != null && (
-                                <span>Memory: {selectedProblem.memoryLimitMb} MB</span>
-                            )}
-                            {selectedProblem?.testCaseCount != null && (
-                                <span>Test Cases: {selectedProblem.testCaseCount}</span>
-                            )}
-                        </div>
-                    </div>
-
-                    {submissionState.status && (
-                        <div className="submission-panel">
-                            <div className="status-card">
-                                <div className="status-card-header">
-                                    <div>
-                                        <div><strong>ID:</strong> {shortSubmissionId}</div>
-                                        <div className="status-line">
-                                            <strong>Status:</strong>
-                                            <span className={`status-pill ${statusVisual.tone}`}>{statusVisual.label}</span>
-                                        </div>
-                                    </div>
-                                    <div className="status-actions">
-                                        {submissionState.id && (
-                                            <button className="copy-btn" onClick={copySubmissionId} aria-label="Copy submission id">
-                                                Copy ID
-                                            </button>
-                                        )}
-                                        {copyMessage && <span className="copy-feedback">{copyMessage}</span>}
-                                        {submissionState.error && (
-                                            <button className="error-toggle" onClick={() => setShowError((s) => !s)}>
-                                                {showError ? "Hide Error" : "Show Error"}
-                                            </button>
-                                        )}
-                                    </div>
+                    <div className="workspace-grid">
+                        <section className="panel code-panel">
+                            <div className="studio-head">
+                                <div>
+                                    <p className="section-eyebrow">Workspace</p>
+                                    <h2 className="studio-title">Code Editor</h2>
                                 </div>
+                                <p className="studio-copy">Write, clean up, and submit from one place.</p>
+                            </div>
 
-                                <div className="status-summary">
-                                    {submissionState.verdict && (
-                                        <div className={`verdict ${submissionState.verdict === "ACCEPTED" ? "ok" : "bad"}`}>
-                                            {submissionState.verdict}
-                                        </div>
-                                    )}
-                                    {submissionState.timeTaken != null && (
-                                        <div><strong>Time:</strong> {submissionState.timeTaken} ms</div>
-                                    )}
-                                    {submissionState.memoryUsed != null && (
-                                        <div><strong>Memory:</strong> {submissionState.memoryUsed} KB</div>
-                                    )}
+                            <div className="form-row">
+                                <div className="form-field">
+                                    <label htmlFor="language">Language</label>
+                                    <select
+                                        id="language"
+                                        value={language}
+                                        onChange={(event) => setLanguage(event.target.value)}
+                                    >
+                                        <option value="cpp">C++</option>
+                                        <option value="python">Python 3</option>
+                                        <option value="java">Java</option>
+                                    </select>
                                 </div>
+                            </div>
 
-                                {submissionState.status === "FAILED" && submissionState.error && (
-                                    <div className="error-block">
-                                        <strong className="error-title">Error trace</strong>
-                                        {showError ? (
-                                            <div className="error-preview" role="region">
-                                                <pre className="error-content expanded">{submissionState.error}</pre>
-                                            </div>
-                                        ) : (
-                                            <div className="error-preview compact">
-                                                <pre className="error-content compact">{submissionState.error}</pre>
-                                            </div>
-                                        )}
-                                    </div>
+                            <div className="editor-toolbar" role="toolbar" aria-label="Code editor actions">
+                                <button className="tool-btn" type="button" onClick={handleRefactor}>Refactor</button>
+                                <button className="tool-btn ghost" type="button" onClick={handleResetCode}>Reset</button>
+                                {editorMessage && <span className="editor-message">{editorMessage}</span>}
+                            </div>
+
+                            <div className="editor-shell">
+                                <Editor
+                                    height="600px"
+                                    language={monacoLanguageMap[language] || "plaintext"}
+                                    value={code}
+                                    onChange={(value) => setCode(value || "")}
+                                    onMount={handleEditorMount}
+                                    theme="vs-dark"
+                                    options={{
+                                        minimap: { enabled: false },
+                                        fontSize: 14,
+                                        lineNumbers: "on",
+                                        smoothScrolling: true,
+                                        padding: { top: 10, bottom: 10 },
+                                        automaticLayout: true,
+                                        tabSize: 4,
+                                        insertSpaces: true,
+                                        formatOnPaste: true,
+                                        formatOnType: true,
+                                    }}
+                                />
+                            </div>
+
+                            <div className="action-row">
+                                <button className="submit-btn" onClick={handleSubmit} disabled={submissionState.loading}>
+                                    {submissionState.loading ? "Judging..." : "Submit Solution"}
+                                </button>
+                                {submissionState.status && (
+                                    <span className={`judge-state ${statusVisual.tone}`}>
+                                        <span className="judge-state-dot" />
+                                        {statusVisual.label}
+                                    </span>
                                 )}
                             </div>
-                        </div>
-                    )}
-                </aside>
+                        </section>
+
+                        <aside className="panel insights-panel">
+                            <div className="insights-head">
+                                <div>
+                                    <p className="section-eyebrow">Submission Status</p>
+                                    <h2 className="studio-title">Run Details</h2>
+                                </div>
+                                <p className="studio-copy">
+                                    {submissionState.status
+                                        ? hasTerminalStatus
+                                            ? "Latest submission id, verdict, time, memory, and error details."
+                                            : "Watching your current submission status and runtime details."
+                                        : "Submit code to see the current submission id, status, verdict, time, memory, and errors here."}
+                                </p>
+                            </div>
+
+                            {submissionState.status ? (
+                                <div className="status-card">
+                                    <div className="status-card-header">
+                                        <div>
+                                            <div><strong>ID:</strong> {shortSubmissionId}</div>
+                                            <div className="status-line">
+                                                <strong>Status:</strong>
+                                                <span className={`status-pill ${statusVisual.tone}`}>{statusVisual.label}</span>
+                                            </div>
+                                        </div>
+                                        <div className="status-actions">
+                                            {submissionState.id && (
+                                                <button className="copy-btn" onClick={copySubmissionId} aria-label="Copy submission id">
+                                                    Copy ID
+                                                </button>
+                                            )}
+                                            {copyMessage && <span className="copy-feedback">{copyMessage}</span>}
+                                            {submissionState.error && (
+                                                <button className="error-toggle" onClick={() => setShowError((s) => !s)}>
+                                                    {showError ? "Hide Error" : "Show Error"}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="status-summary">
+                                        {submissionState.verdict && (
+                                            <div className={`verdict ${submissionState.verdict === "ACCEPTED" ? "ok" : "bad"}`}>
+                                                {submissionState.verdict}
+                                            </div>
+                                        )}
+                                        {submissionState.timeTaken != null && (
+                                            <div><strong>Time:</strong> {submissionState.timeTaken} ms</div>
+                                        )}
+                                        {submissionState.memoryUsed != null && (
+                                            <div><strong>Memory:</strong> {submissionState.memoryUsed} KB</div>
+                                        )}
+                                    </div>
+
+                                    {submissionState.status === "FAILED" && submissionState.error && (
+                                        <div className="error-block">
+                                            <strong className="error-title">Error trace</strong>
+                                            {showError ? (
+                                                <div className="error-preview" role="region">
+                                                    <pre className="error-content expanded">{submissionState.error}</pre>
+                                                </div>
+                                            ) : (
+                                                <div className="error-preview compact">
+                                                    <pre className="error-content compact">{submissionState.error}</pre>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="submission-placeholder">
+                                    <div className="submission-placeholder-mark" aria-hidden>01</div>
+                                    <h3>No active run</h3>
+                                    <p>Pick a problem, write your answer, and submit once you are ready. Verdict, time, memory, and errors show up here.</p>
+                                </div>
+                            )}
+                        </aside>
+                    </div>
+                </main>
             </div>
         </div>
     );

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearStoredAuth } from "./auth";
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || "http://localhost:8080/api",
@@ -30,6 +31,19 @@ const ensureCsrfToken = async () => {
     return csrfReadyPromise;
 };
 
+const isAuthExemptRequest = (url = "") => {
+    return ["/auth/login", "/auth/register", "/auth/google", "/auth/logout", "/auth/csrf"].some((path) =>
+        url.includes(path)
+    );
+};
+
+const redirectToLogin = () => {
+    if (typeof window === "undefined") return;
+    const pathname = window.location.pathname;
+    if (pathname === "/login" || pathname === "/register") return;
+    window.location.replace("/login");
+};
+
 api.interceptors.request.use(async (config) => {
     const method = (config.method || "get").toLowerCase();
     const shouldPrimeCsrf = ["post", "put", "patch", "delete"].includes(method)
@@ -46,6 +60,31 @@ api.interceptors.request.use(async (config) => {
 
     return config;
 });
+
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        const status = error?.response?.status;
+        const requestUrl = error?.config?.url || "";
+
+        if (status === 401 && !isAuthExemptRequest(requestUrl)) {
+            clearStoredAuth();
+            redirectToLogin();
+        }
+
+        return Promise.reject(error);
+    }
+);
+
+export const getAuthSession = async () => {
+    try {
+        const res = await api.get("/auth/me");
+        return res.data;
+    } catch (error) {
+        console.error("Error fetching auth session:", error);
+        throw error;
+    }
+};
 
 export const getProblems = async () => {
     try {
